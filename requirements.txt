@@ -1,0 +1,11 @@
+scipy
+numpy
+pandas
+matplotlib
+scikit-learn
+scipy
+mpmath
+emcee
+geopandas
+pyshp
+statsmodels
