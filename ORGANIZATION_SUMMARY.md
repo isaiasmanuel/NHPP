@@ -1,8 +1,8 @@
-# NHPP Research Project - Organization Summary
+# NHPP Baseball Hit Clustering Project - Organized
 
 ## ✅ What Was Done
 
-Your research code has been reorganized into a **professional, modular project structure** ready for research publications and collaboration.
+Your research code has been reorganized into a **professional, modular project structure** ready for research publications and collaboration on baseball hit clustering analysis.
 
 ### 1. **Folder Structure Created**
 ```
@@ -22,7 +22,8 @@ NHPP/
 | **Core Bayesian** | `src/core/bayesian_model.py` | Posterior, cluster assignment, diagnostics |
 | **Config** | `src/core/config.py` | Global parameter management |
 | **Data Generation** | `src/simulation/data_generation.py` | Thinning, chain initialization |
-| **Earthquake Data** | `src/analysis/earthquake_data.py` | Load, filter, preprocess catalogs |
+| **Hit Data** | `src/analysis/baseball_hit_data.py` | Load, filter, preprocess hit catalogs |
+| **Data Extraction** | `src/data_extraction.py` | StatCast fetching, preparation (NEW!) |
 | **Post-MCMC** | `src/postprocessing/clustering_analysis.py` | PSM, Binder loss, VI distance |
 
 ### 3. **Reference Templates Created**
@@ -42,7 +43,7 @@ Three complete workflow templates in `notebooks/`:
   - Usage examples
 
 - **config_templates.py** — Pre-built configurations:
-  - `MEXICO_CONFIG` — Cocos subduction zone parameters
+  - `BASEBALL_CONFIG` — MLB StatCast hit data parameters
   - `SYNTHETIC_CONFIG` — Synthetic data parameters
   - Helper function for building priors
 
@@ -78,17 +79,19 @@ Three complete workflow templates in `notebooks/`:
 - `thinning_sampler()` — Generate synthetic points
 - `initialize_chain_state()` — Setup chain state
 
-### **Mexico.py** → `notebooks/02_mexico_template.py`
+### **Mexico.py** → `notebooks/02_baseball_template.py`
 **Original**: Earthquake data loading + analysis  
 **New approach**:
-- Utility functions in `src/analysis/earthquake_data.py`
+- Utility functions in `src/analysis/baseball_hit_data.py`
+- New extraction utilities in `src/data_extraction.py`
 - Template script shows proper workflow
 - Modular, reusable components
 
 **Key functions extracted**:
-- `load_and_filter_earthquakes()` — Filter by region/magnitude/depth
-- `earthquakes_to_spatiotemporal()` — Convert to point process format
+- `load_and_filter_hits()` — Filter by region/exit velocity/launch angle
+- `hits_to_spatiotemporal()` — Convert to point process format
 - `assign_time_partition()` — Temporal binning
+- `quick_load_season()` — One-liner data loading!
 
 ### **Clustering.R** → `notebooks/03_postprocessing_template.py`
 **Original**: R-based post-MCMC clustering analysis  
@@ -116,15 +119,16 @@ Three complete workflow templates in `notebooks/`:
 
 2. **Import modules**:
    ```python
-   from src.config_templates import MEXICO_CONFIG, build_priors
-   from src.analysis import load_and_filter_earthquakes
+   from src.config_templates import BASEBALL_CONFIG, build_priors
+   from src.analysis import load_and_filter_hits
+   from src.data_extraction import quick_load_season
    from src.postprocessing import posterior_similarity_matrix
    ```
 
 3. **Configure**:
    ```python
-   config = MEXICO_CONFIG.copy()
-   config['year_min'] = 2005  # Custom parameter
+   config = BASEBALL_CONFIG.copy()
+   config['exit_velocity_min'] = 55  # Custom parameter
    priors = build_priors(config)
    ```
 
@@ -153,16 +157,18 @@ Three complete workflow templates in `notebooks/`:
 1. **Install dependencies**:
    ```bash
    pip install -r requirements.txt
+   # Also install: pip install pybaseball (for StatCast data)
    ```
 
-2. **Start with a template**:
-   ```bash
-   python notebooks/02_mexico_template.py  # Test Mexico workflow
+2. **Quick test - Load a season**:
+   ```python
+   from src.data_extraction import quick_load_season
+   data = quick_load_season(2023)  # Instant one-liner!
    ```
 
-3. **Run your MCMC** (see original Simulado.py for full loop):
+3. **Start with a template**:
    ```bash
-   python my_analysis.py  # Saves to results/chains/
+   python notebooks/02_baseball_template.py  # Test baseball workflow
    ```
 
 4. **Analyze results**:

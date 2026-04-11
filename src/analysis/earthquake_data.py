@@ -1,7 +1,8 @@
 """
-Real earthquake data loading and preprocessing.
+Baseball hit data loading and preprocessing.
 
-Handles earthquake catalog filtering, temporal binning, and visualization.
+Handles hit catalog filtering, temporal binning, and visualization.
+Uses StatCast hit coordinate data (x, y) and game date information.
 """
 
 import pandas as pd
@@ -9,72 +10,73 @@ import numpy as np
 from datetime import datetime
 
 
-def load_and_filter_earthquakes(
+def load_and_filter_hits(
     csv_path,
     xlim,
     Xlim,
     ylim,
     Ylim,
-    depth_max=100,
-    magnitude_min=4.0,
-    year_min=2000,
+    exit_velocity_min=50,
+    launch_angle_min=None,
+    launch_angle_max=None,
     exclude_region=None,
 ):
     """
-    Load and filter earthquake catalog.
+    Load and filter baseball hit catalog.
     
     Parameters
     ----------
     csv_path : str
-        Path to earthquake CSV file
+        Path to hit catalog CSV file (StatCast format)
     xlim, Xlim, ylim, Ylim : float
-        Geographic domain bounds (longitude, latitude)
-    depth_max : float
-        Maximum depth filter
-    magnitude_min : float
-        Minimum magnitude filter
-    year_min : int
-        Minimum year filter
+        Field coordinate domain bounds (feet)
+    exit_velocity_min : float, optional
+        Minimum exit velocity in mph (default: 50)
+    launch_angle_min : float, optional
+        Minimum launch angle in degrees
+    launch_angle_max : float, optional
+        Maximum launch angle in degrees
     exclude_region : tuple, optional
-        Region to exclude: ((lon_min, lon_max), (lat_min, lat_max))
+        Region to exclude: ((x_min, x_max), (y_min, y_max))
     
     Returns
     -------
     pd.DataFrame
-        Filtered earthquake catalog
+        Filtered hit catalog
     """
     df = pd.read_csv(csv_path)
 
-    # Spatial filter
-    df = df[(df["Longitude"] < Xlim) & (df["Longitude"] > xlim)]
-    df = df[(df["Latitude"] < Ylim) & (df["Latitude"] > ylim)]
+    # Spatial filter: field coordinates
+    df = df[(df["hc_x"] < Xlim) & (df["hc_x"] > xlim)]
+    df = df[(df["hc_y"] < Ylim) & (df["hc_y"] > ylim)]
 
-    # Depth filter
-    df = df[df["Depth"] <= depth_max]
+    # Exit velocity filter
+    df = df[df["exit_velocity"] >= exit_velocity_min]
 
-    # Magnitude filter
-    df = df[df["Mw*"] >= magnitude_min]
+    # Launch angle filters
+    if launch_angle_min is not None:
+        df = df[df["launch_angle"] >= launch_angle_min]
+    if launch_angle_max is not None:
+        df = df[df["launch_angle"] <= launch_angle_max]
 
-    # Temporal filter
-    df = df[df["Year"] >= year_min]
-
-    # Exclude region
+    # Exclude region if specified
     if exclude_region is not None:
-        (lon_min, lon_max), (lat_min, lat_max) = exclude_region
-        df = df[~((df["Longitude"] > lon_min) & (df["Latitude"] > lat_min))]
+        (x_min, x_max), (y_min, y_max) = exclude_region
+        df = df[~((df["hc_x"] > x_min) & (df["hc_x"] < x_max) & 
+                  (df["hc_y"] > y_min) & (df["hc_y"] < y_max))]
 
     df = df.reset_index(drop=True)
     return df
 
 
-def earthquakes_to_spatiotemporal(earthquakes, min_date, max_date):
+def hits_to_spatiotemporal(hits, min_date, max_date):
     """
-    Convert earthquake catalog to spatio-temporal point process format.
+    Convert hit catalog to spatio-temporal point process format.
     
     Parameters
     ----------
-    earthquakes : pd.DataFrame
-        Earthquake catalog with Year, Month, Day, Hour, Minute, Second columns
+    hits : pd.DataFrame
+        Hit catalog with game_date column and hc_x, hc_y coordinates
     min_date : datetime
         Reference start time
     max_date : datetime
@@ -83,43 +85,36 @@ def earthquakes_to_spatiotemporal(earthquakes, min_date, max_date):
     Returns
     -------
     tuple
-        (SimPoisson, Tmax) where SimPoisson has columns [lon, lat, time_days]
+        (SimPoisson, Tmax) where SimPoisson has columns [x, y, time_days]
     """
-    # Build datetime for each event
-    fechas = []
-    for i, row in earthquakes.iterrows():
-        dt = datetime(
-            int(row["Year"]),
-            int(row["Month"]),
-            int(row["Day"]),
-            int(row["Hour"]),
-            int(row["Minute"]),
-            int(row["Second"]),
-        )
-        fechas.append(dt)
+    # Convert game_date to datetime if not already
+    if not isinstance(hits['game_date'].dtype, 'datetime64'):
+        dates = pd.to_datetime(hits['game_date'])
+    else:
+        dates = hits['game_date']
 
     # Convert to days since min_date
-    segundos_por_dia = 86400
-    diferencias = np.array([(f - min_date).total_seconds() for f in fechas])
-    diferencias = diferencias / segundos_por_dia
+    seconds_per_day = 86400
+    time_diffs = np.array([(d - min_date).total_seconds() for d in dates])
+    time_diffs = time_diffs / seconds_per_day
 
     # Time span
-    Tmax = (max_date - min_date).total_seconds() / segundos_por_dia
+    Tmax = (max_date - min_date).total_seconds() / seconds_per_day
 
-    SimPoisson = earthquakes[["Longitude", "Latitude"]].to_numpy()
-    SimPoisson = np.hstack((SimPoisson, diferencias.reshape(-1, 1)))
+    SimPoisson = hits[["hc_x", "hc_y"]].to_numpy()
+    SimPoisson = np.hstack((SimPoisson, time_diffs.reshape(-1, 1)))
 
     return SimPoisson, Tmax
 
 
 def assign_time_partition(SimPoisson, pT, Tmax):
     """
-    Assign each event to a temporal partition.
+    Assign each hit to a temporal partition.
     
     Parameters
     ----------
     SimPoisson : ndarray
-        Spatio-temporal data (N x 3): [lon, lat, time]
+        Spatio-temporal data (N x 3): [x, y, time]
     pT : int
         Number of temporal partitions
     Tmax : float
@@ -134,7 +129,7 @@ def assign_time_partition(SimPoisson, pT, Tmax):
     SimPoisson = np.hstack((SimPoisson, np.zeros((len(SimPoisson), 1))))
 
     for i in range(pT):
-        mask = (CutPoint[i] < SimPoisson[:, 2]) & (SimPoisson[:, 2] < CutPoint[i + 1])
+        mask = (CutPoint[i] < SimPoisson[:, 2]) & (SimPoisson[:, 2] <= CutPoint[i + 1])
         SimPoisson[mask, 3] = i
 
     return SimPoisson

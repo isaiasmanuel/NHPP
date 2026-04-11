@@ -1,16 +1,16 @@
-# NHPP Earthquake Spatial-Temporal Clustering Research
+# NHPP Baseball Hit Spatial-Temporal Clustering Research
 
-A comprehensive research framework for analyzing earthquake clustering using **Hierarchical Bayesian Non-Homogeneous Poisson Process (NHPP)** models with **Dirichlet Process Mixtures**.
+A comprehensive research framework for analyzing baseball hit clustering using **Hierarchical Bayesian Non-Homogeneous Poisson Process (NHPP)** models with **Dirichlet Process Mixtures**.
 
 ## Overview
 
 This project implements state-of-the-art Bayesian methods to:
-- Model spatio-temporal earthquake clustering
-- Learn cluster structure from data via Dirichlet Process Mixtures
-- Handle temporal non-stationarity through time-varying mixture weights
-- Perform posterior inference via MCMC sampling
+- Model spatio-temporal baseball hit clustering patterns
+- Learn cluster structure from hit data via Dirichlet Process Mixtures
+- Handle temporal non-stationarity through time-varying mixture weights (season effects)
+- Perform posterior inference via MCMC sampling on hit location data
 
-**Supported datasets**: Real earthquake catalogs (Mexico Cocos subduction zone) and synthetic point patterns
+**Supported datasets**: Real MLB StatCast hit data (2015-present) and synthetic hit patterns
 
 ---
 
@@ -19,9 +19,9 @@ This project implements state-of-the-art Bayesian methods to:
 ```
 NHPP_Research/
 ├── data/
-│   ├── raw/              # Original earthquake catalogs, shapefiles
-│   ├── processed/        # Cleaned, filtered data
-│   └── synthetic/        # Generated synthetic point patterns
+│   ├── raw/              # Original StatCast hit data
+│   ├── processed/        # Cleaned, filtered hit data
+│   └── synthetic/        # Generated synthetic hit patterns
 ├── src/
 │   ├── core/
 │   │   ├── __init__.py
@@ -32,10 +32,11 @@ NHPP_Research/
 │   │   └── data_generation.py   # Thinning, chain initialization
 │   ├── analysis/
 │   │   ├── __init__.py
-│   │   └── earthquake_data.py   # Loading, filtering, binning
+│   │   └── baseball_hit_data.py   # Loading, filtering, binning
 │   ├── postprocessing/
 │   │   ├── __init__.py
 │   │   └── clustering_analysis.py # PSM, Binder loss, VI distance
+│   ├── data_extraction.py        # StatCast data fetching & preparation
 │   └── config_templates.py       # Configuration presets
 ├── results/
 │   ├── chains/           # MCMC chain outputs (.npy)
@@ -71,45 +72,57 @@ pip install -r requirements.txt
 
 ## Quick Start
 
-### 1. Load and Preprocess Earthquake Data
+### 1. Quick Load Baseball Season Data
+
+```python
+from src.data_extraction import quick_load_season
+
+# Load and prepare a full season in one line!
+data = quick_load_season(2023, min_exit_velocity=50, pT=4)
+
+SimPoisson = data['SimPoisson']  # Spatio-temporal hit coordinates
+Tmax = data['Tmax']  # Season duration in days
+hits_partitioned = data['hits_partitioned']  # With temporal partitions
+```
+
+### 2. Manual Load and Preprocess Hit Data
 
 ```python
 import numpy as np
 from datetime import datetime
-from src.analysis.earthquake_data import (
-    load_and_filter_earthquakes,
-    earthquakes_to_spatiotemporal,
+from src.analysis.baseball_hit_data import (
+    load_and_filter_hits,
+    hits_to_spatiotemporal,
     assign_time_partition
 )
-from src.config_templates import MEXICO_CONFIG, build_priors
+from src.config_templates import BASEBALL_CONFIG, build_priors
 
-# Load earthquake catalog
-config = MEXICO_CONFIG
-earthquakes = load_and_filter_earthquakes(
-    'data/raw/Earthquakes.csv',
+# Load hit catalog
+config = BASEBALL_CONFIG
+hits = load_and_filter_hits(
+    'data/raw/statcast_2023.csv',
     config['xlim'], config['Xlim'],
     config['ylim'], config['Ylim'],
-    depth_max=config['depth_max'],
-    magnitude_min=config['magnitude_min'],
-    year_min=config['year_min'],
-    exclude_region=config['exclude_region']
+    exit_velocity_min=config['exit_velocity_min'],
+    launch_angle_min=config['launch_angle_min'],
+    launch_angle_max=config['launch_angle_max'],
 )
 
 # Convert to spatio-temporal format
-min_date = datetime(config['year_min'], 1, 1)
-max_date = datetime(2015, 12, 31)
-SimPoisson, Tmax = earthquakes_to_spatiotemporal(
-    earthquakes, min_date, max_date
+min_date = datetime(2023, 3, 28)  # Opening day 2023
+max_date = datetime(2023, 10, 1)  # End of regular season
+SimPoisson, Tmax = hits_to_spatiotemporal(
+    hits, min_date, max_date
 )
 
 # Assign time partitions
 L = config['pT'] * config['ClustTiempo']
 SimPoisson = assign_time_partition(SimPoisson, config['pT'], Tmax)
 
-print(f"Events: {len(SimPoisson)}, Time span: {Tmax:.1f} days")
+print(f"Hits: {len(SimPoisson)}, Season span: {Tmax:.1f} days")
 ```
 
-### 2. Initialize and Run MCMC
+### 3. Initialize and Run MCMC
 
 ```python
 from src.simulation.data_generation import initialize_chain_state
@@ -135,11 +148,11 @@ Variables((Tmax, config['pT'], config['xlim'], config['Xlim'],
 Cadena = [init_state]
 Variables2(Cadena)
 
-# Run MCMC updates (see Simulado.py as reference for full loop)
-# Save chain: np.save('results/chains/chain_mexico.npy', Cadena)
+# Run MCMC updates (see 02_baseball_template.py as reference for full loop)
+# Save chain: np.save('results/chains/chain_2023.npy', Cadena)
 ```
 
-### 3. Post-MCMC Analysis
+### 4. Post-MCMC Analysis
 
 ```python
 from src.postprocessing.clustering_analysis import (

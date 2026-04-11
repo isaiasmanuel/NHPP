@@ -8,33 +8,33 @@ from scipy.stats import invwishart, multivariate_normal, gamma
 import numpy as np
 
 # ============================================================================
-# MEXICO EARTHQUAKES - COCOS SUBDUCTION ZONE
+# MLB BASEBALL - PITCH HIT LOCATIONS
 # ============================================================================
 
-MEXICO_CONFIG = {
-    # Geographic domain (longitude, latitude)
-    "xlim": -105.5,
-    "Xlim": -96.5,
-    "ylim": 15.0,
-    "Ylim": 20.0,
+BASEBALL_CONFIG = {
+    # Field coordinate domain (feet, origin at center)
+    "xlim": -150,
+    "Xlim": 150,
+    "ylim": -150,
+    "Ylim": 150,
     # Data filters
-    "depth_max": 100,
-    "magnitude_min": 4.0,
-    "year_min": 2000,
-    "exclude_region": ((-98, -96.5), (18, 20)),  # Gulf of Mexico
+    "exit_velocity_min": 50,  # mph - minimum hard contact threshold
+    "launch_angle_min": -45,  # degrees
+    "launch_angle_max": 90,  # degrees
+    "exclude_region": None,  # Can exclude foul territory if needed
     # Temporal discretization
-    "pT": 4,  # Number of time partitions
+    "pT": 4,  # Number of time partitions (e.g., quarters of season)
     "ClustTiempo": 3,  # Clusters per time period
     # Priors - Normal-Inverse-Wishart for cluster parameters
     "nu": 3,  # Degrees of freedom for Inverse-Wishart
-    "Sprior": np.diag((1, 1)),  # Scale matrix
-    "mu": np.array((-102, 17)),  # Prior mean for cluster centers
-    "lam": 0.01,  # Precision scaling
+    "Sprior": np.diag((50, 50)),  # Scale matrix (field coordinates in feet)
+    "mu": np.array((0, 100)),  # Prior mean for cluster centers
+    "lam": 0.001,  # Precision scaling
     # DP concentration
     "alpha0": 1,
     # Intensity (Poisson rate) prior - Gamma
-    "pgamma": 1,
-    "k": 0.01,
+    "pgamma": 10,  # Hits per day
+    "k": 0.1,
 }
 
 # ============================================================================
