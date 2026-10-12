@@ -10,7 +10,7 @@ Created on Fri Aug  8 13:46:14 2025
 
 import os 
 
-os.chdir('/Users/isaias/Desktop/Poisson_Earthquakes/')
+os.chdir('/Users/isaias/Documents/Poisson_Earthquakes/')
 
 from Funciones import *
 
@@ -286,7 +286,8 @@ for contador in range(ChainSize):
         else :
             m1l=np.zeros(L)
             for i in range(L):
-                m1l[i]=np.sum(Z[SimPoisson[:,3]==TActualizar]==i)
+                # m1l[i]=np.sum(Z[SimPoisson[:,3]==TActualizar]==i)
+                m1l[i]=np.sum(Z[Cadena[-1][3]==TActualizar]==i)
                 # m1l[i]=np.sum(Z==i)
             Betaprop=np.copy(Cadena[-1][Actualizar])
             Betaprop[TActualizar]=dirichlet.rvs(m1l+Cadena[-1][0][TActualizar]*Cadena[-1][1][TActualizar-1],  size=1)
@@ -1112,7 +1113,6 @@ plt.ylabel("Latitude")
 plt.xlabel("Longitude")    
 plt.show()    
 ###################
-
 
 
 
